@@ -8,6 +8,7 @@ from .impl import DefaultImpl
 from sqlalchemy.dialects.postgresql import INTEGER, BIGINT
 from ..autogenerate import render
 from sqlalchemy import text, Numeric, Column
+from sqlalchemy.sql.expression import ColumnClause
 from sqlalchemy.types import NULLTYPE
 from sqlalchemy import types as sqltypes
 
@@ -197,6 +198,11 @@ class PostgresqlImpl(DefaultImpl):
             return meth(type_, autogen_context)
 
         return False
+
+    def _render_HSTORE_type(self, type_, autogen_context):
+        return render._render_type_w_subtype(
+            type_, autogen_context, 'text_type', r'(.+?\(.*text_type=)'
+        )
 
     def _render_ARRAY_type(self, type_, autogen_context):
         return render._render_type_w_subtype(
@@ -416,8 +422,7 @@ def _exclude_constraint(constraint, autogen_context, alter):
             args += [repr(render._ident(constraint.table.name))]
         args.extend([
             "(%s, %r)" % (
-                render._render_potential_expr(
-                    sqltext, autogen_context, wrap_in_text=False),
+                _render_potential_column(sqltext, autogen_context),
                 opstring
             )
             for sqltext, name, opstring in constraint._render_exprs
@@ -435,8 +440,7 @@ def _exclude_constraint(constraint, autogen_context, alter):
     else:
         args = [
             "(%s, %r)" % (
-                render._render_potential_expr(
-                    sqltext, autogen_context, wrap_in_text=False),
+                _render_potential_column(sqltext, autogen_context),
                 opstring
             ) for sqltext, name, opstring in constraint._render_exprs
         ]
@@ -450,3 +454,16 @@ def _exclude_constraint(constraint, autogen_context, alter):
             "prefix": _postgresql_autogenerate_prefix(autogen_context),
             "args": ", ".join(args)
         }
+
+
+def _render_potential_column(value, autogen_context):
+    if isinstance(value, ColumnClause):
+        template = "%(prefix)scolumn(%(name)r)"
+
+        return template % {
+            "prefix": render._sqlalchemy_autogenerate_prefix(autogen_context),
+            "name": value.name
+        }
+
+    else:
+        return render._render_potential_expr(value, autogen_context, wrap_in_text=False)
