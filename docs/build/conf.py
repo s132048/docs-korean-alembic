@@ -59,7 +59,7 @@ source_suffix = '.rst'
 nitpicky = True
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = 'index_ko'
 
 # General information about the project.
 project = u'Alembic'
