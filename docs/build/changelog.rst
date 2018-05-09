@@ -4,8 +4,107 @@ Changelog
 ==========
 
 .. changelog::
-    :version: 0.9.8
+    :version: 0.9.10
     :include_notes_from: unreleased
+
+.. changelog::
+    :version: 0.9.9
+    :released: March 22, 2018
+
+    .. change::
+        :tags: feature, commands
+        :tickets: 481
+
+        Added new flag ``--indicate-current`` to the ``alembic history`` command.
+        When listing versions, it will include the token "(current)" to indicate
+        the given version is a current head in the target database.  Pull request
+        courtesy Kazutaka Mise.
+
+    .. change::
+        :tags: bug, autogenerate, mysql
+        :tickets: 455
+
+        The fix for :ticket:`455` in version 0.9.6 involving MySQL server default
+        comparison was entirely non functional, as the test itself was also broken
+        and didn't reveal that it wasn't working. The regular expression to compare
+        server default values like CURRENT_TIMESTAMP to current_timestamp() is
+        repaired.
+
+    .. change::
+        :tags: bug, mysql, autogenerate
+        :tickets: 483
+
+        Fixed bug where MySQL server default comparisons were basically not working
+        at all due to incorrect regexp added in :ticket:`455`.  Also accommodates
+        for MariaDB 10.2 quoting differences in reporting integer based server
+        defaults.
+
+
+
+
+    .. change::
+        :tags: bug, operations, mysql
+        :tickets: 487
+
+        Fixed bug in ``op.drop_constraint()`` for MySQL where
+        quoting rules would not be applied to the constraint name.
+
+.. changelog::
+    :version: 0.9.8
+    :released: February 16, 2018
+
+    .. change::
+        :tags: bug, runtime
+        :tickets: 482
+
+        Fixed bug where the :meth:`.Script.as_revision_number` method
+        did not accommodate for the 'heads' identifier, which in turn
+        caused the :meth:`.EnvironmentContext.get_head_revisions`
+        and :meth:`.EnvironmentContext.get_revision_argument` methods
+        to be not usable when multiple heads were present.
+        The :meth:.`EnvironmentContext.get_head_revisions` method returns
+        a tuple in all cases as documented.
+
+
+
+    .. change::
+        :tags: bug, postgresql, autogenerate
+        :tickets: 478
+
+        Fixed bug where autogenerate of :class:`.ExcludeConstraint`
+        would render a raw quoted name for a Column that has case-sensitive
+        characters, which when invoked as an inline member of the Table
+        would produce a stack trace that the quoted name is not found.
+        An incoming Column object is now rendered as ``sa.column('name')``.
+
+    .. change::
+        :tags: bug, autogenerate
+        :tickets: 468
+
+        Fixed bug where the indexes would not be included in a
+        migration that was dropping the owning table.   The fix
+        now will also emit DROP INDEX for the indexes ahead of time,
+        but more importantly will include CREATE INDEX in the
+        downgrade migration.
+
+    .. change::
+        :tags: bug, postgresql
+        :tickets: 480
+
+        Fixed the autogenerate of the module prefix
+        when rendering the text_type parameter of
+        postgresql.HSTORE, in much the same way that
+        we do for ARRAY's type and JSON's text_type.
+
+    .. change::
+        :tags: bug, mysql
+        :tickets: 479
+
+        Added support for DROP CONSTRAINT to the MySQL Alembic
+        dialect to support MariaDB 10.2 which now has real
+        CHECK constraints.  Note this change does **not**
+        add autogenerate support, only support for op.drop_constraint()
+        to work.
 
 .. changelog::
     :version: 0.9.7
