@@ -174,6 +174,13 @@ class MySQLOpTest(TestBase):
             "ALTER TABLE t1 DROP FOREIGN KEY f1"
         )
 
+    def test_drop_fk_quoted(self):
+        context = op_fixture('mysql')
+        op.drop_constraint("MyFk", "MyTable", "foreignkey")
+        context.assert_(
+            "ALTER TABLE `MyTable` DROP FOREIGN KEY `MyFk`"
+        )
+
     def test_drop_constraint_primary(self):
         context = op_fixture('mysql')
         op.drop_constraint('primary', 't1', type_='primary')
@@ -188,12 +195,25 @@ class MySQLOpTest(TestBase):
             "ALTER TABLE t1 DROP INDEX f1"
         )
 
+    def test_drop_unique_quoted(self):
+        context = op_fixture('mysql')
+        op.drop_constraint("MyUnique", "MyTable", "unique")
+        context.assert_(
+            "ALTER TABLE `MyTable` DROP INDEX `MyUnique`"
+        )
+
     def test_drop_check(self):
-        op_fixture('mysql')
-        assert_raises_message(
-            NotImplementedError,
-            "MySQL does not support CHECK constraints.",
-            op.drop_constraint, "f1", "t1", "check"
+        context = op_fixture('mysql')
+        op.drop_constraint("f1", "t1", "check")
+        context.assert_(
+            "ALTER TABLE t1 DROP CONSTRAINT f1"
+        )
+
+    def test_drop_check_quoted(self):
+        context = op_fixture('mysql')
+        op.drop_constraint("MyCheck", "MyTable", "check")
+        context.assert_(
+            "ALTER TABLE `MyTable` DROP CONSTRAINT `MyCheck`"
         )
 
     def test_drop_unknown(self):
@@ -278,9 +298,11 @@ class MySQLDefaultCompareTest(TestBase):
         t1.create(self.bind)
         insp = Inspector.from_engine(self.bind)
         cols = insp.get_columns(t1.name)
+        refl = Table(t1.name, MetaData())
+        insp.reflecttable(refl, None)
         ctx = self.autogen_context['context']
         return ctx.impl.compare_server_default(
-            None,
+            refl.c[cols[0]['name']],
             col,
             rendered,
             cols[0]['default'])
@@ -295,4 +317,24 @@ class MySQLDefaultCompareTest(TestBase):
         self._compare_default_roundtrip(
             TIMESTAMP(),
             None, "CURRENT_TIMESTAMP",
+        )
+
+    def test_compare_integer_same(self):
+        self._compare_default_roundtrip(
+            Integer(), "5"
+        )
+
+    def test_compare_integer_diff(self):
+        self._compare_default_roundtrip(
+            Integer(), "5", "7"
+        )
+
+    def test_compare_boolean_same(self):
+        self._compare_default_roundtrip(
+            Boolean(), "1"
+        )
+
+    def test_compare_boolean_diff(self):
+        self._compare_default_roundtrip(
+            Boolean(), "1", "0"
         )

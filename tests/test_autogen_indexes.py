@@ -424,6 +424,65 @@ class AutogenerateUniqueIndexTest(AutogenFixtureTest, TestBase):
         diffs = self._fixture(m1, m2)
         eq_(diffs[0][0], 'remove_index')
 
+    def test_drop_table_w_indexes(self):
+        m1 = MetaData()
+        m2 = MetaData()
+
+        t = Table(
+            'some_table', m1,
+            Column('id', Integer, primary_key=True),
+            Column('x', String(20)),
+            Column('y', String(20)),
+        )
+        Index('xy_idx', t.c.x, t.c.y)
+        Index('y_idx', t.c.y)
+
+        diffs = self._fixture(m1, m2)
+        eq_(diffs[0][0], 'remove_index')
+        eq_(diffs[1][0], 'remove_index')
+        eq_(diffs[2][0], 'remove_table')
+
+        eq_(
+            set([diffs[0][1].name, diffs[1][1].name]),
+            set(['xy_idx', 'y_idx'])
+        )
+
+    # this simply doesn't fully work before we had
+    # effective deduping of indexes/uniques.
+    @config.requirements.sqlalchemy_100
+    def test_drop_table_w_uq_constraint(self):
+        m1 = MetaData()
+        m2 = MetaData()
+
+        Table(
+            'some_table', m1,
+            Column('id', Integer, primary_key=True),
+            Column('x', String(20)),
+            Column('y', String(20)),
+            UniqueConstraint('y', name='uq_y')
+        )
+
+        diffs = self._fixture(m1, m2)
+
+        if self.reports_unique_constraints_as_indexes:
+            # for MySQL this UQ will look like an index, so
+            # make sure it at least sets it up correctly
+            eq_(diffs[0][0], 'remove_index')
+            eq_(diffs[1][0], 'remove_table')
+            eq_(len(diffs), 2)
+
+            constraints = [c for c in diffs[1][1].constraints
+                           if isinstance(c, UniqueConstraint)]
+            eq_(len(constraints), 0)
+        else:
+            eq_(diffs[0][0], 'remove_table')
+            eq_(len(diffs), 1)
+
+            constraints = [c for c in diffs[0][1].constraints
+                           if isinstance(c, UniqueConstraint)]
+            if self.reports_unique_constraints:
+                eq_(len(constraints), 1)
+
     def test_unnamed_cols_changed(self):
         m1 = MetaData()
         m2 = MetaData()
@@ -553,6 +612,34 @@ class AutogenerateUniqueIndexTest(AutogenFixtureTest, TestBase):
         Index('foo_idx', t1.c.x.desc())
         t2 = Table('add_ix', m2, Column('x', String(50)))
         Index('foo_idx', t2.c.x.desc())
+        diffs = self._fixture(m1, m2)
+
+        eq_(diffs, [])
+
+    # fails in the 0.8 series where we have truncation rules,
+    # but no control over quoting. passes in 0.7.9 where we don't have
+    # truncation rules either.    dropping these ancient versions
+    # is long overdue.
+
+    @config.requirements.sqlalchemy_09
+    def test_unchanged_case_sensitive_implicit_idx(self):
+        m1 = MetaData()
+        m2 = MetaData()
+        Table('add_ix', m1, Column('regNumber', String(50), index=True))
+        Table('add_ix', m2, Column('regNumber', String(50), index=True))
+        diffs = self._fixture(m1, m2)
+
+        eq_(diffs, [])
+
+    @config.requirements.sqlalchemy_09
+    def test_unchanged_case_sensitive_explicit_idx(self):
+        m1 = MetaData()
+        m2 = MetaData()
+        t1 = Table('add_ix', m1, Column('reg_number', String(50)))
+        Index('regNumber_idx', t1.c.reg_number)
+        t2 = Table('add_ix', m2, Column('reg_number', String(50)))
+        Index('regNumber_idx', t2.c.reg_number)
+
         diffs = self._fixture(m1, m2)
 
         eq_(diffs, [])
